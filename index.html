@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Candidate Search & Filter Tool</title>
+<style>
+:root{--primary:#2563eb;--primary-dark:#1d4ed8;--bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#0f172a;--text2:#64748b;--success:#10b981;--danger:#ef4444;--warning:#f59e0b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+.header{background:linear-gradient(135deg,#1e40af 0%,#2563eb 100%);color:#fff;padding:24px;text-align:center}
+.header h1{font-size:26px;margin-bottom:4px}
+.header p{opacity:.9;font-size:14px}
+.container{max-width:1500px;margin:0 auto;padding:20px}
+.stats-bar{display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap}
+.stat-box{flex:1;min-width:150px;background:var(--card);padding:14px 18px;border-radius:8px;border:1px solid var(--border);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.stat-box .label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.stat-box .value{font-size:22px;font-weight:700;color:var(--primary);margin-top:2px}
+.filters-panel{background:var(--card);padding:20px;border-radius:10px;border:1px solid var(--border);margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.filters-panel h3{font-size:14px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.filters-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.filter-group{display:flex;flex-direction:column}
+.filter-group label{font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px}
+/* Multi-Select Styles */
+.multi-select{position:relative}
+.ms-header{border:1px solid var(--border);border-radius:6px;padding:6px 8px;min-height:38px;cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:4px;background:#fff;transition:all .15s}
+.ms-header:hover{border-color:var(--primary)}
+.ms-header.active{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.ms-tags{display:flex;flex-wrap:wrap;gap:3px;flex:1}
+.ms-tag{background:#dbeafe;color:#1e40af;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:3px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ms-tag .x{cursor:pointer;font-weight:700;color:#1e40af;font-size:13px;line-height:1}
+.ms-tag .x:hover{color:var(--danger)}
+.ms-placeholder{color:var(--text2);font-size:13px;padding:2px 4px}
+.ms-count{background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.ms-arrow{font-size:10px;color:var(--text2);margin-left:4px;transition:transform .2s}
+.ms-header.active .ms-arrow{transform:rotate(180deg)}
+.ms-dropdown{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:6px;max-height:320px;z-index:1000;box-shadow:0 10px 25px rgba(0,0,0,.12);overflow:hidden;flex-direction:column}
+.ms-dropdown.open{display:flex}
+.ms-search-wrap{padding:8px;border-bottom:1px solid var(--border);display:flex;gap:6px;align-items:center}
+.ms-search{flex:1;border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:13px;outline:none}
+.ms-search:focus{border-color:var(--primary)}
+.ms-actions{display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);background:#f8fafc;font-size:12px}
+.ms-actions label{display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:600;color:var(--text2)}
+.ms-actions label:hover{color:var(--primary)}
+.ms-actions button{background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;font-weight:600;padding:2px 4px}
+.ms-actions button:hover{text-decoration:underline}
+.ms-options{overflow-y:auto;flex:1}
+.ms-option{padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;transition:background .1s}
+.ms-option:hover{background:#f1f5f9}
+.ms-option input{cursor:pointer;accent-color:var(--primary)}
+.ms-option.hidden{display:none}
+.ms-empty{padding:16px;text-align:center;color:var(--text2);font-style:italic;font-size:12px}
+/* Buttons */
+.btn-row{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.btn{padding:9px 18px;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-secondary{background:#fff;color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:#f8fafc}
+.btn-export{background:var(--success);color:#fff}
+.btn-export:hover{background:#059669}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-danger:hover{background:#dc2626}
+/* Results */
+.results-panel{background:var(--card);border-radius:10px;border:1px solid var(--border);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.table-wrap{overflow-x:auto;max-height:65vh;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f8fafc;color:var(--text);padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:5;cursor:pointer;user-select:none}
+th:hover{background:#e2e8f0}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:hover{background:#f8fafc}
+.btn-sm{padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;display:inline-block;border:1px solid}
+.btn-view{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+.btn-view:hover{background:#1e40af;color:#fff}
+.btn-pdf{background:#fef2f2;color:#dc2626;border-color:#fecaca}
+.btn-pdf:hover{background:#dc2626;color:#fff}
+.no-results{padding:40px;text-align:center;color:var(--text2)}
+.pagination{display:flex;justify-content:center;align-items:center;gap:10px;padding:14px;background:#f8fafc;border-top:1px solid var(--border)}
+.pagination button{padding:6px 14px;font-size:12px}
+.pagination span{font-size:13px;color:var(--text2);font-weight:500}
+/* Modal */
+.modal{display:none;position:fixed;z-index:2000;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);overflow-y:auto;padding:30px 15px}
+.modal.open{display:block}
+.modal-content{background:#fff;margin:0 auto;max-width:800px;border-radius:12px;padding:28px;position:relative;box-shadow:0 20px 40px rgba(0,0,0,.2)}
+.modal-close{position:absolute;top:12px;right:16px;background:none;border:none;font-size:28px;cursor:pointer;color:var(--text2);line-height:1}
+.modal-close:hover{color:var(--danger)}
+.modal-content h2{color:var(--primary);margin-bottom:4px;padding-right:40px}
+.modal-content .sub{color:var(--text2);font-size:13px;margin-bottom:16px}
+.modal-section{margin-bottom:18px}
+.modal-section h4{font-size:13px;color:var(--primary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.modal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.modal-field{background:#f8fafc;padding:8px 10px;border-radius:5px;border-left:3px solid var(--primary)}
+.modal-field .lbl{font-size:10px;color:var(--text2);text-transform:uppercase;font-weight:700;letter-spacing:.3px}
+.modal-field .val{font-size:13px;font-weight:500;word-break:break-word;margin-top:2px}
+.modal-pdf-btn{display:block;text-align:center;margin-top:16px;padding:12px;background:var(--danger);color:#fff;text-decoration:none;border-radius:6px;font-weight:600}
+.modal-pdf-btn:hover{background:#dc2626}
+@media(max-width:768px){.filters-grid{grid-template-columns:1fr}.modal-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="header">
+<h1>Candidate Search & Filter Tool</h1>
+<p>Layered faceted search — filters update dynamically based on your selections</p>
+</div>
+
+<div class="container">
+
+<div class="stats-bar">
+<div class="stat-box"><div class="label">Total Candidates</div><div class="value" id="statTotal">0</div></div>
+<div class="stat-box"><div class="label">Matching</div><div class="value" id="statMatching">0</div></div>
+<div class="stat-box"><div class="label">Active Filters</div><div class="value" id="statActive">0</div></div>
+<div class="stat-box"><div class="label">Search Time</div><div class="value" id="statTime">0ms</div></div>
+</div>
+
+<div class="filters-panel">
+<h3>🔍 Search Filters (Layered — each filter updates the others)</h3>
+<div class="filters-grid" id="filtersGrid">
+<!-- Filters injected by JS -->
+</div>
+</div>
+
+<div class="btn-row">
+<button class="btn btn-primary" onclick="applyFilters()">🔍 Apply Filters</button>
+<button class="btn btn-secondary" onclick="clearAll()">↺ Reset All</button>
+<button class="btn btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+</div>
+
+<div class="results-panel">
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th onclick="sortBy('id')">ID ⇅</th>
+<th onclick="sortBy('name')">Name ⇅</th>
+<th onclick="sortBy('current_position')">Current Position ⇅</th>
+<th onclick="sortBy('current_org')">Organization ⇅</th>
+<th onclick="sortBy('department')">Department ⇅</th>
+<th onclick="sortBy('industry_exp')">Industry ⇅</th>
+<th onclick="sortBy('country')">Country ⇅</th>
+<th>Resume</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="resultsBody"></tbody>
+</table>
+</div>
+<div id="noResults" class="no-results" style="display:none">
+<h3>No candidates match your filters</h3>
+<p>Try broadening your search or clearing some filters</p>
+</div>
+<div class="pagination" id="pagination"></div>
+</div>
+
+</div>
+
+<div class="modal" id="modal">
+<div class="modal-content">
+<button class="modal-close" onclick="closeModal()">&times;</button>
+<div id="modalBody"></div>
+</div>
+</div>
+
+<script>
+// ============================================================
+// CONFIGURATION
+// ============================================================
+const PDF_BASE_URL = './pdfs/';
+const PER_PAGE = 50;
+let ALL_DATA = [];
+let filteredData = [];
+let currentPage = 1;
+let sortKey = 'id';
+let sortDir = 1;
+
+// ============================================================
+// FILTER DEFINITIONS
+// Each filter: key (JSON field), label, type ('multi' or 'text')
+// ============================================================
+const FILTER_DEFS = [
+    {key:'industry_exp',       label:'Industry Experience',        type:'multi'},
+    {key:'product_area',       label:'Product Area',               type:'multi'},
+    {key:'product_area_2',     label:'Product Area 2',             type:'multi'},
+    {key:'current_position',   label:'Current Designation',        type:'multi'},
+    {key:'current_org',        label:'Current Organization',       type:'multi'},
+    {key:'department',         label:'Department',                 type:'multi'},
+    {key:'academic_qual',      label:'Academic Qualification',     type:'multi'},
+    {key:'special_qual',       label:'Special Qualification (CA/FCA/IBA/PhD)', type:'multi'},
+    {key:'certification',      label:'Certification / Training',   type:'multi'},
+    {key:'special_degree_inst',label:'Special Degree Institution', type:'multi'},
+    {key:'country',            label:'Country',                    type:'multi'},
+    {key:'army',               label:'Army',                       type:'multi'},
+    {key:'degree_local_foreign',label:'Degree: Foreign or Local',  type:'multi'},
+];
+
+// ============================================================
+// MULTI-SELECT CLASS (with Select All + Cascading support)
+// ============================================================
+class MultiSelect {
+    constructor(def){
+        this.key = def.key;
+        this.label = def.label;
+        this.selected = new Set();
+        this.allOptions = [];       // full unique list
+        this.visibleOptions = [];   // list after cascading filter
+        this.searchTerm = '';
+        this.render();
+        this.attachEvents();
+    }
+
+    render(){
+        const wrap = document.createElement('div');
+        wrap.className = 'filter-group';
+        wrap.innerHTML = `
+            <label>${this.label}</label>
+            <div class="multi-select" data-key="${this.key}">
+                <div class="ms-header">
+                    <div class="ms-tags"><span class="ms-placeholder">Click to select...</span></div>
+                    <span class="ms-arrow">▼</span>
+                </div>
+                <div class="ms-dropdown">
+                    <div class="ms-search-wrap">
+                        <input type="text" class="ms-search" placeholder="Search ${this.label.toLowerCase()}...">
+                    </div>
+                    <div class="ms-actions">
+                        <label><input type="checkbox" class="ms-select-all"> Select All Visible</label>
+                        <button type="button" class="ms-clear">Clear</button>
+                    </div>
+                    <div class="ms-options"></div>
+                </div>
+            </div>
+        `;
+        document.getElementById('filtersGrid').appendChild(wrap);
+        this.container = wrap.querySelector('.multi-select');
+        this.header = this.container.querySelector('.ms-header');
+        this.tags = this.container.querySelector('.ms-tags');
+        this.dropdown = this.container.querySelector('.ms-dropdown');
+        this.searchInput = this.container.querySelector('.ms-search');
+        this.selectAllCb = this.container.querySelector('.ms-select-all');
+        this.clearBtn = this.container.querySelector('.ms-clear');
+        this.optionsEl = this.container.querySelector('.ms-options');
+    }
+
+    attachEvents(){
+        this.header.addEventListener('click', e => {
+            if(e.target.classList.contains('x')) return;
+            this.toggle();
+        });
+        this.searchInput.addEventListener('input', e => {
+            this.searchTerm = e.target.value.toLowerCase();
+            this.renderOptions();
+            if(!this.dropdown.classList.contains('open')) this.open();
+        });
+        this.searchInput.addEventListener('click', e => e.stopPropagation());
+        this.selectAllCb.addEventListener('change', e => {
+            if(e.target.checked) this.selectAllVisible();
+            else this.clearSelection();
+            this.updateTags();
+            this.renderOptions();
+            onFilterChange();
+        });
+        this.clearBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            this.clearSelection();
+            this.updateTags();
+            this.renderOptions();
+            onFilterChange();
+        });
+        this.optionsEl.addEventListener('change', e => {
+            if(e.target.type === 'checkbox'){
+                const val = e.target.value;
+                if(e.target.checked) this.selected.add(val);
+                else this.selected.delete(val);
+                this.updateTags();
+                this.updateSelectAllState();
+                onFilterChange();
+            }
+        });
+        document.addEventListener('click', e => {
+            if(!this.container.contains(e.target)) this.close();
+        });
+    }
+
+    toggle(){ this.dropdown.classList.contains('open') ? this.close() : this.open(); }
+    open(){
+        document.querySelectorAll('.ms-dropdown.open').forEach(d => {
+            if(d !== this.dropdown){ d.classList.remove('open'); d.closest('.multi-select').querySelector('.ms-header').classList.remove('active'); }
+        });
+        this.dropdown.classList.add('open');
+        this.header.classList.add('active');
+        this.searchInput.focus();
+    }
+    close(){
+        this.dropdown.classList.remove('open');
+        this.header.classList.remove('active');
+        this.searchInput.value = '';
+        this.searchTerm = '';
+        this.renderOptions();
+    }
+
+    // Set the full list of options (called once at init)
+    setAllOptions(opts){
+        this.allOptions = [...new Set(opts.filter(o => o))].sort((a,b)=>a.localeCompare(b));
+        this.visibleOptions = [...this.allOptions];
+        this.renderOptions();
+    }
+
+    // Update visible options based on cascading (called when other filters change)
+    updateVisibleOptions(opts){
+        this.visibleOptions = [...new Set(opts.filter(o => o))].sort((a,b)=>a.localeCompare(b));
+        // Remove selected values that are no longer available
+        const visibleSet = new Set(this.visibleOptions);
+        let changed = false;
+        for(const v of this.selected){
+            if(!visibleSet.has(v)){ this.selected.delete(v); changed = true; }
+        }
+        this.renderOptions();
+        this.updateTags();
+        return changed;
+    }
+
+    renderOptions(){
+        const filtered = this.visibleOptions.filter(o => o.toLowerCase().includes(this.searchTerm));
+        if(filtered.length === 0){
+            this.optionsEl.innerHTML = `<div class="ms-empty">No matches found</div>`;
+            return;
+        }
+        this.optionsEl.innerHTML = filtered.map(o => `
+            <label class="ms-option">
+                <input type="checkbox" value="${this.escapeAttr(o)}" ${this.selected.has(o)?'checked':''}>
+                <span>${this.escapeHtml(o)}</span>
+            </label>
+        `).join('');
+        this.updateSelectAllState();
+    }
+
+    selectAllVisible(){
+        const filtered = this.visibleOptions.filter(o => o.toLowerCase().includes(this.searchTerm));
+        filtered.forEach(o => this.selected.add(o));
+    }
+
+    clearSelection(){
+        this.selected.clear();
+        this.selectAllCb.checked = false;
+    }
+
+    updateSelectAllState(){
+        const filtered = this.visibleOptions.filter(o => o.toLowerCase().includes(this.searchTerm));
+        if(filtered.length === 0){ this.selectAllCb.checked = false; return; }
+        const allSelected = filtered.every(o => this.selected.has(o));
+        const someSelected = filtered.some(o => this.selected.has(o));
+        this.selectAllCb.checked = allSelected;
+        this.selectAllCb.indeterminate = someSelected && !allSelected;
+    }
+
+    updateTags(){
+        if(this.selected.size === 0){
+            this.tags.innerHTML = `<span class="ms-placeholder">Click to select...</span>`;
+        } else {
+            const arr = [...this.selected];
+            const shown = arr.slice(0, 3);
+            const extra = arr.length - shown.length;
+            this.tags.innerHTML = shown.map(v => `
+                <span class="ms-tag" title="${this.escapeAttr(v)}">
+                    ${this.escapeHtml(v.length>25?v.slice(0,22)+'...':v)}
+                    <span class="x" data-val="${this.escapeAttr(v)}">&times;</span>
+                </span>
+            `).join('') + (extra>0 ? `<span class="ms-count">+${extra}</span>` : '');
+            this.tags.querySelectorAll('.x').forEach(x => {
+                x.addEventListener('click', e => {
+                    e.stopPropagation();
+                    this.selected.delete(x.dataset.val);
+                    this.updateTags();
+                    this.renderOptions();
+                    onFilterChange();
+                });
+            });
+        }
+    }
+
+    getSelected(){ return [...this.selected]; }
+    hasSelection(){ return this.selected.size > 0; }
+
+    escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    escapeAttr(s){ return this.escapeHtml(s); }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+const multiSelects = {};
+
+async function loadData(){
+    try{
+        const r = await fetch('data.json');
+        const j = await r.json();
+        ALL_DATA = j.records || j;
+    }catch(e){
+        console.error('Failed to load data.json', e);
+        ALL_DATA = [];
+    }
+    document.getElementById('statTotal').textContent = ALL_DATA.length.toLocaleString();
+    buildFilters();
+    applyFilters();
+}
+
+function buildFilters(){
+    FILTER_DEFS.forEach(def => {
+        const ms = new MultiSelect(def);
+        multiSelects[def.key] = ms;
+        // Initial full options
+        const vals = [];
+        ALL_DATA.forEach(rec => {
+            splitField(rec[def.key]).forEach(v => vals.push(v));
+        });
+        ms.setAllOptions(vals);
+    });
+}
+
+// Split a field by ; or ,
+function splitField(val){
+    if(!val) return [];
+    return String(val).split(/[;,]/).map(s => s.trim()).filter(Boolean);
+}
+
+// ============================================================
+// LAYERED / FACETED FILTERING
+// ============================================================
+function onFilterChange(){
+    // Recompute visible options for each dropdown (cascading)
+    updateAllDropdownOptions();
+    // Re-apply filters
+    applyFilters();
+}
+
+function updateAllDropdownOptions(){
+    FILTER_DEFS.forEach(def => {
+        const ms = multiSelects[def.key];
+        // Get data filtered by ALL OTHER filters (not this one)
+        const otherFiltered = ALL_DATA.filter(rec => {
+            for(const otherDef of FILTER_DEFS){
+                if(otherDef.key === def.key) continue;
+                const otherMs = multiSelects[otherDef.key];
+                if(!otherMs.hasSelection()) continue;
+                const recVals = splitField(rec[otherDef.key]);
+                const sel = otherMs.getSelected();
+                if(!sel.some(s => recVals.includes(s))) return false;
+            }
+            return true;
+        });
+        // Build new options list from this filtered data
+        const newOpts = [];
+        otherFiltered.forEach(rec => splitField(rec[def.key]).forEach(v => newOpts.push(v)));
+        ms.updateVisibleOptions(newOpts);
+    });
+}
+
+function applyFilters(){
+    const t0 = performance.now();
+    filteredData = ALL_DATA.filter(rec => {
+        for(const def of FILTER_DEFS){
+            const ms = multiSelects[def.key];
+            if(!ms.hasSelection()) continue;
+            const recVals = splitField(rec[def.key]);
+            const sel = ms.getSelected();
+            if(!sel.some(s => recVals.includes(s))) return false;
+        }
+        return true;
+    });
+    const t1 = performance.now();
+    document.getElementById('statTime').textContent = Math.round(t1-t0) + 'ms';
+    document.getElementById('statMatching').textContent = filteredData.length.toLocaleString();
+    let active = 0;
+    FILTER_DEFS.forEach(d => { if(multiSelects[d.key].hasSelection()) active++; });
+    document.getElementById('statActive').textContent = active;
+    currentPage = 1;
+    renderTable();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderTable(){
+    const tbody = document.getElementById('resultsBody');
+    const noRes = document.getElementById('noResults');
+    const total = filteredData.length;
+    const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+    if(currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage-1)*PER_PAGE;
+    const page = filteredData.slice(start, start+PER_PAGE);
+
+    if(total === 0){
+        tbody.innerHTML = '';
+        noRes.style.display = 'block';
+    } else {
+        noRes.style.display = 'none';
+        tbody.innerHTML = page.map(r => `
+            <tr>
+                <td><strong>${esc(r.id)}</strong></td>
+                <td>${esc(r.name)}</td>
+                <td>${esc(r.current_position)}</td>
+                <td>${esc(r.current_org)}</td>
+                <td>${esc(r.department)}</td>
+                <td>${esc(r.industry_exp)}</td>
+                <td>${esc(r.country)}</td>
+                <td><a href="${PDF_BASE_URL}${r.id}.pdf" target="_blank" class="btn-sm btn-pdf">PDF</a></td>
+                <td><a href="#" class="btn-sm btn-view" onclick="viewDetails('${r.id}');return false;">View</a></td>
+            </tr>
+        `).join('');
+    }
+    renderPagination(totalPages);
+}
+
+function renderPagination(totalPages){
+    const p = document.getElementById('pagination');
+    p.innerHTML = `
+        <button class="btn btn-secondary" onclick="goPage(1)" ${currentPage===1?'disabled':''}>« First</button>
+        <button class="btn btn-secondary" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹ Prev</button>
+        <span>Page ${currentPage} of ${totalPages} (${filteredData.length} results)</span>
+        <button class="btn btn-secondary" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>Next ›</button>
+        <button class="btn btn-secondary" onclick="goPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>Last »</button>
+    `;
+}
+
+function goPage(n){
+    const totalPages = Math.max(1, Math.ceil(filteredData.length / PER_PAGE));
+    if(n<1) n=1; if(n>totalPages) n=totalPages;
+    currentPage = n;
+    renderTable();
+    document.querySelector('.table-wrap').scrollTop = 0;
+}
+
+function sortBy(key){
+    if(sortKey === key) sortDir = -sortDir;
+    else { sortKey = key; sortDir = 1; }
+    filteredData.sort((a,b) => {
+        const va = (a[key]||'').toString().toLowerCase();
+        const vb = (b[key]||'').toString().toLowerCase();
+        return va < vb ? -sortDir : va > vb ? sortDir : 0;
+    });
+    renderTable();
+}
+
+function clearAll(){
+    FILTER_DEFS.forEach(d => multiSelects[d.key].clearSelection());
+    FILTER_DEFS.forEach(d => {
+        multiSelects[d.key].updateTags();
+        multiSelects[d.key].renderOptions();
+    });
+    onFilterChange();
+}
+
+function esc(s){
+    if(s===null||s===undefined) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+function viewDetails(id){
+    const r = ALL_DATA.find(x => x.id === id);
+    if(!r) return;
+    const f = (lbl,val) => val ? `<div class="modal-field"><div class="lbl">${lbl}</div><div class="val">${esc(val)}</div></div>` : '';
+    let html = `<h2>${esc(r.name||'')}</h2>`;
+    html += `<div class="sub">${esc(r.id)} • ${esc(r.current_position||'')} @ ${esc(r.current_org||'')}</div>`;
+    html += `<div class="modal-section"><h4>Professional</h4><div class="modal-grid">`;
+    html += f('Department', r.department);
+    html += f('Industry', r.industry_exp);
+    html += f('Product Area', r.product_area);
+    html += f('Product Area 2', r.product_area_2);
+    html += f('Total Experience', r.total_exp ? r.total_exp+' years' : '');
+    html += f('Country', r.country);
+    html += f('Army', r.army);
+    html += f('Management Level', r.mgmt_level);
+    html += `</div></div>`;
+    html += `<div class="modal-section"><h4>Education</h4><div class="modal-grid">`;
+    html += f('Academic Qualification', r.academic_qual);
+    html += f('Last Degree', r.last_degree);
+    html += f('Subject', r.subject);
+    html += f('Special Qualification', r.special_qual);
+    html += f('Special Degree Institution', r.special_degree_inst);
+    html += f('Degree Type', r.degree_local_foreign === 'f' ? 'Foreign' : r.degree_local_foreign === 'l' ? 'Local' : r.degree_local_foreign);
+    html += `</div></div>`;
+    html += `<div class="modal-section"><h4>Certifications & Skills</h4><div class="modal-grid">`;
+    html += f('Training / Certification', r.certification);
+    html += f('Core Competencies', r.core_competencies);
+    html += f('Technical Skills', r.technical_skills);
+    html += `</div></div>`;
+    html += `<div class="modal-section"><h4>Contact</h4><div class="modal-grid">`;
+    html += f('Phone', r.phone);
+    html += f('Email', r.email);
+    html += f('Location Preferred', r.location_pref);
+    html += f('Current Salary', r.current_salary);
+    html += f('Salary Expectation', r.salary_expect);
+    html += `</div></div>`;
+    html += `<a href="${PDF_BASE_URL}${r.id}.pdf" target="_blank" class="modal-pdf-btn">⬇ Download Full Resume PDF</a>`;
+    document.getElementById('modalBody').innerHTML = html;
+    document.getElementById('modal').classList.add('open');
+}
+
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+document.getElementById('modal').addEventListener('click', e => {
+    if(e.target.id === 'modal') closeModal();
+});
+
+// ============================================================
+// EXPORT CSV
+// ============================================================
+function exportCSV(){
+    const headers = ['ID','Name','Current Position','Organization','Department','Industry','Product Area','Product Area 2','Country','Academic Qualification','Certification','Army','Degree Type','Phone','Email','PDF Link'];
+    const rows = filteredData.map(r => [
+        r.id, r.name, r.current_position, r.current_org, r.department, r.industry_exp,
+        r.product_area, r.product_area_2, r.country, r.academic_qual, r.certification,
+        r.army||'', r.degree_local_foreign==='f'?'Foreign':r.degree_local_foreign==='l'?'Local':r.degree_local_foreign||'',
+        r.phone, r.email, `${PDF_BASE_URL}${r.id}.pdf`
+    ]);
+    let csv = headers.map(h => `"${h}"`).join(',') + '\n';
+    rows.forEach(row => {
+        csv += row.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',') + '\n';
+    });
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'filtered_candidates.csv'; a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Start
+loadData();
+</script>
+</body>
+</html>
